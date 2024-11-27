@@ -38,3 +38,18 @@ class FederatedClient:
         except Exception as e:
             print(f"[ERROR] Client compute_update with CMCR failed: {str(e)}")
             raise
+        
+def client_train(client, global_weights):
+    """
+    Perform client training in a distributed setup.
+    Args:
+        client: The FederatedClient instance.
+        global_weights: The global model weights to initialize the client's model.
+    Returns:
+        Tuple of (update, weight) for aggregation.
+    """
+    try:
+        return client.compute_update(global_weights)
+    except Exception as e:
+        print(f"[ERROR] Client training failed: {str(e)}")
+        return None, None

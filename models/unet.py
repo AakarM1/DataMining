@@ -38,3 +38,14 @@ class UNet(nn.Module):
         cmcr_loss = torch.mean((features_ct - features_mri) ** 2)
         return cmcr_loss
 
+    def save_model(self, path="model.pth"):
+        """
+        Save the model weights.
+        """
+        torch.save(self.state_dict(), path)
+
+    def load_model(self, path="model.pth"):
+        """
+        Load the model weights.
+        """
+        self.load_state_dict(torch.load(path))
