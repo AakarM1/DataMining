@@ -1,0 +1,2 @@
+torch>=1.10.0    # For PyTorch (deep learning framework)
+numpy>=1.21.0    # For numerical computations

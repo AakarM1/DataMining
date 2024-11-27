@@ -1,0 +1,36 @@
+2024-11-25 15:26:36,297 [INFO] Initializing Federated Server...
+2024-11-25 15:26:39,273 [INFO] Creating 4 clients...
+2024-11-25 15:26:39,293 [INFO] Starting Federated Training...
+2024-11-25 15:26:39,294 [INFO] Epoch 1/5
+2024-11-25 15:26:43,225 [INFO] Global weights updated successfully.
+2024-11-25 15:26:43,225 [INFO] Epoch 2/5
+2024-11-25 15:26:44,894 [INFO] Global weights updated successfully.
+2024-11-25 15:26:44,895 [INFO] Epoch 3/5
+2024-11-25 15:26:46,356 [INFO] Global weights updated successfully.
+2024-11-25 15:26:46,357 [INFO] Epoch 4/5
+2024-11-25 15:26:47,944 [INFO] Global weights updated successfully.
+2024-11-25 15:26:47,945 [INFO] Epoch 5/5
+2024-11-25 15:26:49,769 [INFO] Global weights updated successfully.
+2024-11-25 15:32:16,738 [INFO] Initializing unet model for Federated Server...
+2024-11-25 15:32:16,740 [INFO] Creating 4 clients...
+2024-11-25 15:32:16,769 [INFO] Starting Federated Training...
+2024-11-25 15:32:16,770 [INFO] Epoch 1/5
+2024-11-25 15:32:20,532 [INFO] Global weights updated successfully.
+2024-11-25 15:32:20,533 [INFO] Evaluating global model...
+2024-11-25 15:32:20,546 [INFO] Evaluation - Dice: 0.0000, IoU: 0.0000
+2024-11-25 15:32:20,547 [INFO] Epoch 2/5
+2024-11-25 15:32:22,060 [INFO] Global weights updated successfully.
+2024-11-25 15:32:22,061 [INFO] Evaluating global model...
+2024-11-25 15:32:22,070 [INFO] Evaluation - Dice: 0.0000, IoU: 0.0000
+2024-11-25 15:32:22,071 [INFO] Epoch 3/5
+2024-11-25 15:32:23,412 [INFO] Global weights updated successfully.
+2024-11-25 15:32:23,412 [INFO] Evaluating global model...
+2024-11-25 15:32:23,423 [INFO] Evaluation - Dice: 0.0000, IoU: 0.0000
+2024-11-25 15:32:23,424 [INFO] Epoch 4/5
+2024-11-25 15:32:24,909 [INFO] Global weights updated successfully.
+2024-11-25 15:32:24,910 [INFO] Evaluating global model...
+2024-11-25 15:32:24,919 [INFO] Evaluation - Dice: 0.0000, IoU: 0.0000
+2024-11-25 15:32:24,919 [INFO] Epoch 5/5
+2024-11-25 15:32:26,335 [INFO] Global weights updated successfully.
+2024-11-25 15:32:26,336 [INFO] Evaluating global model...
+2024-11-25 15:32:26,344 [INFO] Evaluation - Dice: 0.0000, IoU: 0.0000
