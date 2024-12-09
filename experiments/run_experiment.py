@@ -6,11 +6,10 @@ from utils.logger import setup_logger
 from fedseg.federated import FederatedServer
 from fedseg.client import FederatedClient
 from models.model_loader import get_model
-from data.loaders import get_dataloader
+from data.loaders import get_dataloader, download_and_prepare_lits, prepare_client_folders, LiTSDataset
 from utils.metrics import dice_coefficient, iou, precision_recall_f1, save_metrics_to_json, save_metrics_to_csv
 from utils.visualizer import visualize_predictions, plot_metrics
-
-from data.loaders import get_dataloader
+from data.loaders import get_dataloader, generate_dummy_data
 import yaml
 
 import multiprocessing
@@ -39,21 +38,48 @@ def main(args):
         # args.batch_size = config['training']['batch_size']
         # args.learning_rate = config['training']['learning_rate']
         # args.num_clients = config['training']['num_clients']
+        
+        if args.dataset == "dummy":
+            logger.info("Generating dummy data for all clients...")
+            for client_id in range(args.num_clients):
+                generate_dummy_data(
+                    client_id=client_id,
+                    dataset_name=args.dataset,
+                    num_samples=10,  # Adjust the number of samples as needed
+                    input_shape=(1, 64, 64)
+                )
+            logger.info("Dummy data generation complete.")
 
-        logger.info(f"Initializing {args.model} model for Federated Server...")
+        if args.dataset == "lits":
+            logger.info("Checking for LiTS dataset...")
+            download_and_prepare_lits(data_dir="./data/lits")
+            logger.info("LiTS dataset is ready.")
+
+            # Prepare client-specific folders
+            logger.info("Preparing client-specific dataset folders...")
+            prepare_client_folders(
+                data_dir="./data/lits",
+                client_base_dir="./client_{i}_lits",
+                num_clients=args.num_clients
+            )
+
+
+        logger.info(f"Initializing {args.model} model for Federated Server with {args.dataset}...")
         shared_model = get_model(args.model)
         server = FederatedServer(shared_model, learning_rate=args.learning_rate)
 
+        # Prepare client folders
+        prepare_client_folders(data_dir="./data/lits", client_base_dir="./data/clients/client_{i}", num_clients=args.num_clients)
+
+        # Initialize Client
         logger.info(f"Creating {args.num_clients} clients...")
         clients = []
         for i in range(args.num_clients):
             model = get_model(args.model)
-            dataset = get_dataloader(
-                dataset_name=args.dataset,
-                data_dir=f"./client_{i}_{args.dataset}",
-                batch_size=args.batch_size,
-                input_shape=(1, 64, 64)
-            )
+            
+            if args.dataset == "lits":
+                dataset = LiTSDataset(data_dir=f"./data/clients/client_{i}", input_shape=(1, 64, 64))
+
             clients.append(FederatedClient(model, dataset, heterogeneity_factor=1.0))
 
         logger.info("Starting Federated Training...")
@@ -111,5 +137,7 @@ def main(args):
         save_metrics_to_json(metrics_log, path="metrics.json")
         save_metrics_to_csv(metrics_log, path="metrics.csv")
         plot_metrics(metrics_log, save_path="metrics_plot.png")
+        logger.info("Federated Training Complete.")
+
     except Exception as e:
         logger.error(f"Experiment failed: {str(e)}")

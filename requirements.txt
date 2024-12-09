@@ -4,3 +4,5 @@ numpy>=1.21.0          # For numerical operations
 matplotlib>=3.4.0      # For visualizing predictions
 pyyaml>=5.4.1          # For handling YAML configuration files
 tqdm>=4.64.0           # For progress bar tracking
+kaggle>=1.5.12         # For Kaggle API
+nibabel>=5.1.0         # Handling medical imaging data in NIfTI format

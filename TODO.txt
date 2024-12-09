@@ -1,1 +1,3 @@
 add more models in models/model_loader.py
+iid and non-iid in loaders.py/prepare_client_folders()
+Clients should be generated in data/clients 
