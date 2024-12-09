@@ -1,0 +1,9 @@
+model: unet
+dataset:
+  name: medical
+  path: ./data
+training:
+  epochs: 5
+  batch_size: 16
+  learning_rate: 0.01
+  num_clients: 4

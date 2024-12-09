@@ -1,3 +1,9 @@
 __init__.py
 __pycache__/
 venv/
+delete.py
+.env
+lits/
+*.log
+*.png
+*.json
