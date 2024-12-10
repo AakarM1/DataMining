@@ -6,15 +6,18 @@ from utils.logger import setup_logger
 from fedseg.federated import FederatedServer
 from fedseg.client import FederatedClient
 from models.model_loader import get_model
-from data.loaders import get_dataloader, download_and_prepare_lits, prepare_client_folders, LiTSDataset
+from data.loaders import get_dataloader, generate_dummy_data, download_and_prepare_lits, prepare_client_folders
+from data.dataset import LiTSDataset
+from data.utils import create_dataloaders, split_clients
 from utils.metrics import dice_coefficient, iou, precision_recall_f1, save_metrics_to_json, save_metrics_to_csv
 from utils.visualizer import visualize_predictions, plot_metrics
-from data.loaders import get_dataloader, generate_dummy_data
 import yaml
 
 import multiprocessing
 from tqdm import tqdm
 from fedseg.client import client_train
+
+from torch.utils.data import DataLoader
 
 def load_config(path="experiments/config.yaml"):
     """
@@ -52,9 +55,33 @@ def main(args):
 
         if args.dataset == "lits":
             logger.info("Checking for LiTS dataset...")
-            download_and_prepare_lits(data_dir="./data/lits")
+            download_and_prepare_lits(data_dir="./data/lits", kaggle_dataset_list = ["andrewmvd/liver-tumor-segmentation","andrewmvd/liver-tumor-segmentation-part-2"])
             logger.info("LiTS dataset is ready.")
 
+            train_loader, val_loader = create_dataloaders(
+                image_dir=args.image_dir,
+                mask_dir=args.mask_dir,
+                batch_size=args.batch_size,
+                val_split=args.val_split,
+                input_shape=(96, 192, 192),
+                augment=args.augment
+            )
+
+            # Step 2: Split train dataset into clients
+            train_dataset = train_loader.dataset
+            client_datasets = split_clients(
+                dataset=train_dataset,
+                num_clients=args.num_clients,
+                strategy=args.split_strategy
+            )
+
+            # Step 3: Create DataLoaders for each client
+            client_loaders = [DataLoader(client_dataset, batch_size=args.batch_size, shuffle=True)
+                            for client_dataset in client_datasets]
+
+            print(f"[INFO] Created {args.num_clients} client DataLoaders using {args.split_strategy} strategy.")
+            print(f"[INFO] Training and validation DataLoaders are ready.")
+            
             # Prepare client-specific folders
             logger.info("Preparing client-specific dataset folders...")
             prepare_client_folders(

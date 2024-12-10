@@ -11,7 +11,12 @@ import kagglehub
 import shutil
 from pathlib import Path
 import nibabel as nib
+from PIL import Image
+import random
+from torch.utils.data import Subset, random_split
 
+
+@DeprecationWarning
 def combine_volume_folders(data_dir="./data/lits"):
     """
     Combine all `volume_pt*` folders into a single directory `volumes_combined`
@@ -113,75 +118,52 @@ def prepare_client_folders(data_dir="./data/lits", client_base_dir="./data/clien
     print("[INFO] Client-specific dataset folders prepared successfully.")
 
 
-def download_and_prepare_lits(data_dir="./data/lits", kaggle_dataset="ag3ntsp1d3rx/litsdataset2"):
+
+def download_and_prepare_lits(data_dir="./data/lits", kaggle_dataset_list=None, download=True):
     """
-    Check if the LiTS dataset exists locally, and download it using KaggleHub if necessary.
-    If downloaded, move the dataset to the specified local directory.
+    Download and prepare the LiTS dataset by combining `volume_pt*` folders into a single `images` folder.
 
     Args:
         data_dir (str): Path to the local directory where the dataset should be stored.
-        kaggle_dataset (str): Kaggle dataset identifier.
+        kaggle_dataset_list (list): List of Kaggle dataset identifiers to download.
+        download (bool): Whether to download the datasets.
 
     Raises:
-        Exception: If downloading or moving the dataset fails.
+        Exception: If downloading or combining the dataset fails.
     """
+    if kaggle_dataset_list is None:
+        kaggle_dataset_list = ["andrewmvd/liver-tumor-segmentation", "andrewmvd/liver-tumor-segmentation-part-2"]
+
     # Check if the dataset directory already exists
-    if os.path.exists(data_dir):
-        print(f"[INFO] LiTS dataset already exists at {data_dir}.")
+    images_dir = Path(data_dir) / "images"
+    if not download and images_dir.exists():
+        print(f"[INFO] LiTS dataset already exists at {images_dir}.")
         return
 
-    print(f"[INFO] LiTS dataset not found locally. Downloading from Kaggle...")
+    print(f"[INFO] Preparing LiTS dataset at {data_dir}...")
 
     try:
-        # Download the dataset using KaggleHub
-        path = kagglehub.dataset_download(kaggle_dataset)
-        print(f"[INFO] Dataset downloaded to cache at {path}.")
+        for kaggle_dataset in kaggle_dataset_list:
+            # Download the dataset using KaggleHub
+            print(f"[INFO] Downloading {kaggle_dataset}...")
+            path = kagglehub.dataset_download(kaggle_dataset)
+            print(f"[INFO] Dataset downloaded to cache at {path}.")
 
-        # Move the dataset to the desired local directory
-        print(f"[INFO] Moving dataset to {data_dir}...")
-        shutil.copytree(path, data_dir)
-        print(f"[INFO] Dataset successfully moved to {data_dir}.")
+            # Combine all volume_pt* folders into `images`
+            for volume_dir in Path(path).glob("volume_pt*"):
+                if volume_dir.is_dir():
+                    print(f"[INFO] Moving files from {volume_dir} to {images_dir}...")
+                    images_dir.mkdir(parents=True, exist_ok=True)
+                    for file in volume_dir.glob("*.nii"):
+                        shutil.copy(file, images_dir / file.name)
+                    shutil.rmtree(volume_dir)
+                    print(f"[INFO] Deleted folder: {volume_dir}")
 
+        print(f"[INFO] Dataset successfully prepared in {images_dir}.")
     except Exception as e:
-        print(f"[ERROR] Failed to download or move the LiTS dataset: {str(e)}")
+        print(f"[ERROR] Failed to download or prepare the LiTS dataset: {str(e)}")
         raise
 
-
-class LiTSDataset(Dataset):
-    """
-    Dataset class for the LiTS dataset (Liver Tumor Segmentation) with PNG images.
-    """
-    def __init__(self, data_dir, input_shape=(1, 64, 64)):
-        self.image_dir = Path(data_dir) / "images"
-        self.mask_dir = Path(data_dir) / "masks"
-        self.input_shape = input_shape
-        self.preprocessor = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Resize(input_shape[1:]),
-            transforms.Normalize(mean=[0.5], std=[0.5])
-        ])
-        self.image_files = sorted(self.image_dir.glob("*.png"))
-        self.mask_files = sorted(self.mask_dir.glob("*.png"))
-
-        if len(self.image_files) != len(self.mask_files):
-            raise ValueError("Mismatch between the number of images and masks.")
-
-    def __len__(self):
-        return len(self.image_files)
-
-    def __getitem__(self, idx):
-        # Load PNG images
-        image_path = self.image_files[idx]
-        mask_path = self.mask_files[idx]
-
-        image = Image.open(image_path).convert("L")  # Convert to grayscale
-        mask = Image.open(mask_path).convert("L")    # Convert to grayscale
-
-        # Preprocess
-        image = self.preprocessor(image)
-        mask = self.preprocessor(mask)  # Masks are resized but not normalized
-
-        return image, mask
 
 def get_dataloader(dataset_name="lits", data_dir="./data", batch_size=8, input_shape=(1, 64, 64)):
     """
