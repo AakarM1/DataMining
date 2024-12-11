@@ -4,34 +4,32 @@ import numpy as np
 import random
 from data.dataset import LiTSDataset
 
-def create_dataloaders(image_dir, mask_dir, batch_size, val_split=0.2, input_shape=(96, 192, 192), augment=True):
-    """
-    Create train and validation DataLoaders.
+from torch.utils.data import DataLoader, random_split
+from torchvision.transforms import Compose, Lambda
+def reduce_channels(x):
+    return x.mean(dim=0, keepdim=True)  # Reduce channels to 1
 
-    Args:
-        image_dir (str): Path to the images directory.
-        mask_dir (str): Path to the masks directory.
-        batch_size (int): Batch size for DataLoader.
-        val_split (float): Fraction of data to use for validation.
-        input_shape (tuple): Target shape for resizing.
-        augment (bool): Whether to apply data augmentation.
+def create_data_loaders(dataset, batch_size=2):
+    # Add a transform to ensure 5D data
+    dataset.transform = Lambda(reduce_channels)  # Replace lambda with named function
 
-    Returns:
-        train_loader, val_loader: DataLoaders for training and validation.
-    """
-    dataset = LiTSDataset(
-        image_paths=sorted(Path(image_dir).glob("*.nii")),
-        mask_paths=sorted(Path(mask_dir).glob("*.nii")),
-        target_shape=input_shape,
-        augment=augment
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        pin_memory=True,
+        num_workers=4
     )
-    val_size = int(len(dataset) * val_split)
-    train_size = len(dataset) - val_size
-
-    train_set, val_set = random_split(dataset, [train_size, val_size])
-
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        pin_memory=True,
+        num_workers=4
+    )
 
     return train_loader, val_loader
 

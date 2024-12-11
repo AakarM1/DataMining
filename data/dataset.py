@@ -3,6 +3,7 @@ from scipy import ndimage
 import nibabel as nib
 import torch
 from torch.utils.data import Dataset
+from torchvision.transforms import Lambda, Compose
 
 
 class DataAugmentation3D:
@@ -32,116 +33,166 @@ class DataAugmentation3D:
         """
         # Horizontal Flip
         if np.random.random() < self.p_flip:
-            image, mask = self.flip(image, mask, axis=1)
+            image = np.flip(image, axis=1)
+            mask = np.flip(mask, axis=1)
         
         # Vertical Flip
         if np.random.random() < self.p_flip:
-            image, mask = self.flip(image, mask, axis=0)
+            image = np.flip(image, axis=0)
+            mask = np.flip(mask, axis=0)
         
         # Depth Flip
         if np.random.random() < self.p_flip:
-            image, mask = self.flip(image, mask, axis=2)
+            image = np.flip(image, axis=2)
+            mask = np.flip(mask, axis=2)
         
-        # Random Rotation
-        angles = np.random.uniform(-self.rotate_angle, self.rotate_angle, size=3)
-        image = self.rotate(image, angles)
-        mask = self.rotate(mask, angles, is_mask=True)
+        # Rotation
+        angle_x = np.random.uniform(-self.rotate_angle, self.rotate_angle)
+        angle_y = np.random.uniform(-self.rotate_angle, self.rotate_angle)
+        angle_z = np.random.uniform(-self.rotate_angle, self.rotate_angle)
         
-        # Resize to target shape
-        image_resized = self.resize(image, self.target_shape, order=1)
-        mask_resized = self.resize(mask, self.target_shape, order=0)
-
+        image = ndimage.rotate(image, angle_x, reshape=False, mode='nearest')
+        image = ndimage.rotate(image, angle_y, axes=(0,2), reshape=False, mode='nearest')
+        image = ndimage.rotate(image, angle_z, axes=(0,1), reshape=False, mode='nearest')
+        
+        mask = ndimage.rotate(mask, angle_x, reshape=False, mode='nearest')
+        mask = ndimage.rotate(mask, angle_y, axes=(0,2), reshape=False, mode='nearest')
+        mask = ndimage.rotate(mask, angle_z, axes=(0,1), reshape=False, mode='nearest')
+        
+        # Resize to target shape to ensure consistency
+        image_resized = ndimage.zoom(image, 
+                               (self.target_shape[0]/image.shape[0], 
+                                self.target_shape[1]/image.shape[1], 
+                                self.target_shape[2]/image.shape[2]), 
+                               order=1)
+        
+        mask_resized = ndimage.zoom(mask, 
+                               (self.target_shape[0]/mask.shape[0], 
+                                self.target_shape[1]/mask.shape[1], 
+                                self.target_shape[2]/mask.shape[2]), 
+                               order=0)  # Use nearest neighbor for masks
+        
+        # Ensure binary mask
+        mask_resized = (mask_resized > 0.5).astype(np.float32)
+        
         return image_resized, mask_resized
 
-    @staticmethod
-    def flip(image, mask, axis):
-        return np.flip(image, axis=axis), np.flip(mask, axis=axis)
+# class LiTSDataset(Dataset):
+#     def __init__(self, image_paths, mask_paths, target_shape=(96, 192, 192), augment=True):
+#         self.image_paths = image_paths
+#         self.mask_paths = mask_paths
+#         self.target_shape = target_shape
+#         self.augmentation = DataAugmentation3D(target_shape=target_shape) if augment else None
 
-    @staticmethod
-    def rotate(volume, angles, is_mask=False):
-        """
-        Apply 3D rotation to the volume along x, y, and z axes.
+#     def __len__(self):
+#         return len(self.image_paths)
 
-        Args:
-        - volume: 3D numpy array
-        - angles: List of rotation angles for x, y, and z
-        - is_mask: Boolean to apply nearest neighbor interpolation for masks
+#     def __getitem__(self, idx):
+#         # Load NIfTI images
+#         image = nib.load(self.image_paths[idx]).get_fdata()
+#         mask = nib.load(self.mask_paths[idx]).get_fdata()
+
+#         # Preprocess
+#         image = self.preprocess_image(image)
+#         mask = self.preprocess_mask(mask)
+
+#         # Apply augmentations if enabled
+#         if self.augmentation is not None:
+#             image, mask = self.augmentation(image, mask)
+
+#         # Convert to tensors
+#         image = torch.from_numpy(image).float().unsqueeze(0)  # Add channel dimension
+#         mask = torch.from_numpy(mask).float().unsqueeze(0)    # Add channel dimension
+
+#         return image, mask
+
+#     def preprocess_image(self, volume):
+#         # Clip and normalize
+#         volume = np.clip(volume, -100, 200)
+#         volume = (volume - volume.min()) / (volume.max() - volume.min())
         
-        Returns:
-        - Rotated volume
-        """
-        order = 0 if is_mask else 1
-        volume = ndimage.rotate(volume, angles[0], axes=(1, 2), reshape=False, order=order, mode='nearest')
-        volume = ndimage.rotate(volume, angles[1], axes=(0, 2), reshape=False, order=order, mode='nearest')
-        volume = ndimage.rotate(volume, angles[2], axes=(0, 1), reshape=False, order=order, mode='nearest')
-        return volume
+#         # Resize using scipy
+#         resized_volume = ndimage.zoom(volume, 
+#                                (self.target_shape[0]/volume.shape[0], 
+#                                 self.target_shape[1]/volume.shape[1], 
+#                                 self.target_shape[2]/volume.shape[2]), 
+#                                order=1)
+#         return resized_volume
 
-    @staticmethod
-    def resize(volume, target_shape, order=1):
-        """
-        Resize a 3D volume to the target shape.
-        
-        Args:
-        - volume: 3D numpy array
-        - target_shape: Desired shape for the volume
-        - order: Interpolation order (1 for linear, 0 for nearest neighbor)
-        
-        Returns:
-        - Resized volume
-        """
-        factors = [t / s for t, s in zip(target_shape, volume.shape)]
-        return ndimage.zoom(volume, factors, order=order)
-
+#     def preprocess_mask(self, mask):
+#         # Binary mask preprocessing
+#         resized_mask = ndimage.zoom(mask, 
+#                             (self.target_shape[0]/mask.shape[0], 
+#                              self.target_shape[1]/mask.shape[1], 
+#                              self.target_shape[2]/mask.shape[2]), 
+#                             order=0)  # Nearest neighbor for binary masks
+#         return (resized_mask > 0.5).astype(np.float32)
+    
 
 class LiTSDataset(Dataset):
     def __init__(self, image_paths, mask_paths, target_shape=(96, 192, 192), augment=True):
         """
-        Dataset for LiTS with optional augmentation.
-        
+        Dataset for LiTS with optional augmentation for 3D volumes.
+
         Args:
-        - image_paths: List of paths to image files
-        - mask_paths: List of paths to mask files
-        - target_shape: Desired shape for the 3D volumes
-        - augment: Boolean to apply augmentation
+        - image_paths: List of paths to image files.
+        - mask_paths: List of paths to mask files.
+        - target_shape: Desired shape for the 3D volumes (depth, height, width).
+        - augment: Boolean to apply data augmentation.
         """
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.target_shape = target_shape
-        self.augmentation = DataAugmentation3D(target_shape=target_shape) if augment else None
+        self.augment = augment
+        self.transform = Compose([
+                        Lambda(self.reduce_channels),
+                    ])
+    def reduce_channels(x):
+        return x.mean(dim=0, keepdim=True)  # Reduce channels to 1
 
     def __len__(self):
         return len(self.image_paths)
 
+    # Dataset __getitem__ method
     def __getitem__(self, idx):
-        # Load NIfTI images
+        # Load NIfTI volumes
         image = nib.load(self.image_paths[idx]).get_fdata()
         mask = nib.load(self.mask_paths[idx]).get_fdata()
 
-        # Preprocess
-        image = self.preprocess_image(image)
-        mask = self.preprocess_mask(mask)
-
-        # Apply augmentations if enabled
-        if self.augmentation:
-            image, mask = self.augmentation(image, mask)
+        # Preprocess image and mask
+        image = self.preprocess_image(image)  # (depth, height, width)
+        mask = self.preprocess_mask(mask)    # (depth, height, width)
 
         # Convert to tensors
-        image = torch.from_numpy(image).float().unsqueeze(0)  # Add channel dimension
-        mask = torch.from_numpy(mask).float().unsqueeze(0)    # Add channel dimension
+        image = torch.from_numpy(image).float().unsqueeze(0)  # Add channel dimension: (1, depth, height, width)
+        mask = torch.from_numpy(mask).float().unsqueeze(0)    # Add channel dimension: (1, depth, height, width)
 
+         # Apply transformation
+        if self.transform:
+            image = self.transform(image)
+            mask = self.transform(mask)  # Optional if mask needs to match
+
+        print(f"Shape of the image is {image.shape} and shape of the mask is {mask.shape}")
         return image, mask
+    
 
     def preprocess_image(self, volume):
         """
-        Preprocess image volume (clip, normalize, resize).
+        Clip, normalize, and resize the image volume.
         """
-        volume = np.clip(volume, -100, 200)
-        volume = (volume - np.min(volume)) / (np.max(volume) - np.min(volume) + 1e-8)
-        return DataAugmentation3D.resize(volume, self.target_shape, order=1)
+        volume = np.clip(volume, -100, 200)  # Clip intensity values
+        volume = (volume - volume.min()) / (volume.max() - volume.min() + 1e-8)  # Normalize
+        factors = [
+            self.target_shape[i] / volume.shape[i] for i in range(3)
+        ]  # Compute resizing factors
+        return ndimage.zoom(volume, factors, order=1)
 
     def preprocess_mask(self, mask):
         """
-        Preprocess binary mask volume (resize, threshold).
+        Resize the mask volume and ensure binary values.
         """
-        resized_mask = DataAugmentation3D.resize(mask, self.target_shape, order=0)
-        return (resized_mask > 0.5).astype(np.float32)
+        factors = [
+            self.target_shape[i] / mask.shape[i] for i in range(3)
+        ]  # Compute resizing factors
+        mask = ndimage.zoom(mask, factors, order=0)  # Nearest-neighbor interpolation for masks
+        return (mask > 0.5).astype(np.float32)

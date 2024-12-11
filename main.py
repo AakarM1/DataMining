@@ -25,7 +25,7 @@ def parse_args():
                     help="Splitting strategy for clients")
 
     # Model options
-    parser.add_argument('--model', type=str, default='unet', choices=['unet'], help='Model to use')
+    parser.add_argument('--model', type=str, default='eunet', choices=['unet', 'eunet'], help='Model to use')
     parser.add_argument('--load_model', type=str, default=None, help='Path to a pre-trained model to load')  # Add this line
 
     return parser.parse_args()

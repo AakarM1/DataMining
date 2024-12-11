@@ -13,23 +13,24 @@ class FederatedClient:
     def compute_update(self, global_weights):
         try:
             self.model.set_weights(global_weights)
-
             optimizer = torch.optim.SGD(self.model.parameters(), lr=0.01)
             criterion = nn.MSELoss()
 
             cmcr_loss_value = 0.0
             for data, target in self.dataset:
+                print(f"Data shape: {data.shape}, Target shape: {target.shape}")
                 optimizer.zero_grad()
                 output = self.model(data)
+                print("Error here")
                 loss = criterion(output, target)
 
                 # Cross-Modal Consistency Loss (use dummy MRI/CT inputs for now)
-                if hasattr(self.model, "compute_cmcr_loss"):
-                    x_ct = torch.randn_like(data)  # Placeholder for CT data
-                    x_mri = torch.randn_like(data)  # Placeholder for MRI data
-                    cmcr_loss = self.model.compute_cmcr_loss(x_ct, x_mri)
-                    loss += cmcr_loss
-                    cmcr_loss_value += cmcr_loss.item()
+                # if hasattr(self.model, "compute_cmcr_loss"):
+                #     x_ct = torch.randn_like(data)  # Placeholder for CT data
+                #     x_mri = torch.randn_like(data)  # Placeholder for MRI data
+                #     cmcr_loss = self.model.compute_cmcr_loss(x_ct, x_mri)
+                #     loss += cmcr_loss
+                #     cmcr_loss_value += cmcr_loss.item()
 
                 loss.backward()
                 optimizer.step()
